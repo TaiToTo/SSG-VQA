@@ -1,0 +1,115 @@
+{
+  "scenes": [
+    {
+      "objects": [
+        {
+          "bbox": [20, 0, 166, 239],
+          "component": "abdominal_wall_cavity",
+          "type": "anatomy",
+          "center": [93.0, 119.5],
+          "location": "top-left"
+        },
+        {
+          "bbox": [88, 0, 399, 239],
+          "component": "liver",
+          "type": "anatomy",
+          "center": [243.5, 119.5],
+          "location": "top-mid"
+        },
+        {
+          "bbox": [290, 234, 367, 239],
+          "component": "gut",
+          "type": "anatomy",
+          "center": [328.5, 236.5],
+          "location": "bottom-right"
+        },
+        {
+          "bbox": [278, 168, 388, 235],
+          "component": "omentum",
+          "type": "anatomy",
+          "center": [333.0, 201.5],
+          "location": "bottom-right"
+        },
+        {
+          "bbox": [153, 9, 289, 220],
+          "component": "gallbladder",
+          "type": "anatomy",
+          "center": [221.0, 114.5],
+          "location": "top-mid"
+        },
+        {
+          "bbox": [198, 3, 279, 37],
+          "component": "grasper",
+          "type": "instrument",
+          "center": [238.5, 20.0],
+          "location": "top-mid"
+        }
+      ],
+      "image_filename": "VID01_0",
+      "relationships": {
+        "above": [
+          [5],
+          [5],
+          [0, 1, 4, 5],
+          [0, 1, 4, 5],
+          [5],
+          []
+        ],
+        "below": [
+          [2, 3],
+          [2, 3],
+          [],
+          [],
+          [2, 3],
+          [0, 1, 2, 3, 4]
+        ],
+        "grasp": [
+          [],
+          [],
+          [],
+          [],
+          [],
+          [4]
+        ],
+        "horizontal": [
+          [1, 4],
+          [],
+          [],
+          [],
+          [],
+          []
+        ],
+        "left": [
+          [],
+          [0],
+          [0, 1, 4, 5],
+          [0, 1, 4, 5],
+          [0],
+          [0]
+        ],
+        "right": [
+          [1, 2, 3, 4, 5],
+          [2, 3],
+          [],
+          [],
+          [2, 3],
+          [2, 3]
+        ],
+        "within": [
+          [],
+          [4],
+          [1, 3],
+          [1],
+          [],
+          [1, 4]
+        ]
+      }
+    }
+  ],
+  "info": {
+    "split": "new",
+    "image_index": 0,
+    "image_filename": ["VID01_0"],
+    "triplet": ["grasper,grasp,gallbladder"]
+  }
+}
