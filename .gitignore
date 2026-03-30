@@ -80,3 +80,5 @@ dist/
 .idea
 .vscode
 .python-version
+
+scene_graph/

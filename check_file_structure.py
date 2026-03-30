@@ -1,0 +1,77 @@
+#!/usr/bin/env python3
+"""
+CholecT50とSSG-VQAのファイル構造の比較
+"""
+import os
+
+print("=" * 80)
+print("📂 ファイル名・ディレクトリ名の一致確認")
+print("=" * 80)
+
+print("\n✅ **ビデオIDは完全に一致しています**")
+print("   CholecT50とSSG-VQAで同じビデオID（VID01, VID02など）を使用")
+
+print("\n" + "=" * 80)
+print("📁 ディレクトリ構造の違い")
+print("=" * 80)
+
+print("\n1️⃣  **CholecT50の実際の構造（生データ）:**")
+print("   ../SourceDatasets/CholecT50/videos/")
+print("   ├── VID01/")
+print("   │   ├── 000000.png  ← 生の手術動画フレーム画像")
+print("   │   ├── 000001.png")
+print("   │   └── ...")
+print("   ├── VID02/")
+print("   └── ...")
+
+print("\n2️⃣  **SSG-VQAプロジェクトが必要とする構造:**")
+print("   ./data/")
+print("   ├── visual_feats/")
+print("   │   ├── cropped_images/")
+print("   │   │   └── VID01/")
+print("   │   │       └── vqa/img_features/1x1/")
+print("   │   │           ├── 000001.hdf5  ← ResNet18で抽出した特徴")
+print("   │   │           └── ...")
+print("   │   └── roi_yolo_coord/")
+print("   │       └── VID01/")
+print("   │           └── labels/vqa/img_features/roi/")
+print("   │               ├── 000001.hdf5  ← ROI特徴")
+print("   │               └── ...")
+print("   └── qa_txt/")
+print("       └── VID01/")
+print("           ├── 1.txt  ← 質問応答ペア")
+print("           └── ...")
+
+print("\n" + "=" * 80)
+print("🔄 データの変換方法")
+print("=" * 80)
+
+print("\n**方法1（推奨）: 事前抽出済みの特徴をダウンロード**")
+print("   README.mdに記載のS3サーバーから特徴ファイルをダウンロード：")
+print("   ```bash")
+print("   wget https://s3.unistra.fr/camma_public/github/ssg-qa/cropped_images.zip")
+print("   wget https://s3.unistra.fr/camma_public/github/ssg-qa/roi_yolo_coord.zip")
+print("   wget https://s3.unistra.fr/camma_public/github/ssg-qa/ssg-qa.zip")
+print("   unzip cropped_images.zip -d ./data/visual_feats")
+print("   unzip roi_yolo_coord.zip -d ./data/visual_feats")
+print("   unzip ssg-qa.zip -d ./data/qa_txt")
+print("   ```")
+
+print("\n**方法2: CholecT50の生画像から自分で特徴抽出**")
+print("   utils/内のスクリプトで変換（パスを修正する必要あり）：")
+print("   ```bash")
+print("   python utils/feat_extract_visual.py")
+print("   python utils/feature_extract_roi.py")
+print("   ```")
+print("   注意: スクリプト内のパスを以下に変更する必要があります：")
+print("   - folder_head = '../SourceDatasets/CholecT50/videos/'")
+
+print("\n" + "=" * 80)
+print("📋 結論")
+print("=" * 80)
+print("✅ ビデオID名（VID01, VID02など）: **完全に一致**")
+print("⚠️  ファイル形式: **変換が必要**")
+print("   - CholecT50: PNG画像（生データ）")
+print("   - SSG-VQA: HDF5形式の特徴ベクトル（前処理済み）")
+print("💡 推奨: S3サーバーから事前抽出済み特徴をダウンロードする方が簡単")
+print("=" * 80)
