@@ -257,29 +257,30 @@ def has_overlap(
 def is_horizontal(
     center_a: Tuple[float, float],
     center_b: Tuple[float, float],
-    y_threshold: float = 40.0,
+    y_threshold: float = 41.0,
     min_x_distance: float = 40.0,
 ) -> bool:
     """
     2つのオブジェクトが「水平関係」にあるかを判定する。
     
     実データ分析の結果:
-    - y差: 0.0～40.5px（最大40.5px）
+    - y差: 0.0～40.5px（最大40.5px → 閾値41.0pxで全カバー）
     - x差: 41.5～151.5px（最小41.5px、平均94.5px）
+    - 片方向のみ（双方向ペア0個、9個中9個が片方向）
     
     Parameters
     ----------
     center_a, center_b : tuple
         各オブジェクトの中心座標 (x, y)
     y_threshold : float
-        許容するy座標の差分（データ分析より40px）
+        許容するy座標の差分（データ分析より41px）
     min_x_distance : float
         最小x距離（データ分析より40px）
 
     Returns
     -------
     bool
-        y差 <= 40px AND x差 >= 40px なら True
+        y差 <= 41px AND x差 >= 40px なら True
         
     Notes
     -----
@@ -303,7 +304,7 @@ def is_horizontal(
 def build_relationships(
     objects: List[ObjectNode],
     triplets: List[str],
-    horizontal_y_threshold: float = 40.0,
+    horizontal_y_threshold: float = 41.0,
     horizontal_min_x_distance: float = 40.0,
     within_overlap_threshold: float = 0.20,
     min_spatial_distance: float = 40.0,
@@ -319,7 +320,7 @@ def build_relationships(
         action relation を表す文字列の配列
         例: ["grasper,grasp,gallbladder"]
     horizontal_y_threshold : float
-        horizontal 判定で使う y差の閾値（データ分析より40px）
+        horizontal 判定で使う y差の閾値（データ分析より41px）
     horizontal_min_x_distance : float
         horizontal 判定で使う最小x距離（データ分析より40px）
     within_overlap_threshold : float
@@ -404,9 +405,30 @@ def build_relationships(
                 elif yj > yi:
                     relationships["below"][i].append(j)
 
-            # ---- horizontal ----
-            # 「水平関係」にある場合に relation を付ける。
-            # 実データ分析より: y差 <= 40px AND x差 >= 40px
+            # ---- within ----
+            # object i と object j が重なっている（接触している）場合、
+            # within[i].append(j) を追加する。
+            # 双方向の overlap 判定を使用（どちらか一方でも閾値以上）
+            if has_overlap(
+                objects[i].bbox,
+                objects[j].bbox,
+                min_overlap_ratio=within_overlap_threshold,
+            ):
+                relationships["within"][i].append(j)
+    
+    # --------------------------------------------------------
+    # horizontal 関係を別処理（片方向のみ）
+    # 実データ分析より:
+    #   - horizontal 関係は100%片方向（双方向ペア0個）
+    #   - 方向性のルールは元データに一貫性なし（i<j: 61.9%, xi<xj: 34.2%）
+    #   - 論文にhorizontalの向きについての定義なし
+    # 方針: 最もシンプルで説明可能な「i<j」ルールを採用
+    #       （元データの不一貫性により完璧な一致は不可能）
+    # --------------------------------------------------------
+    for i in range(num_objects):
+        for j in range(i + 1, num_objects):  # i < j のみ
+            # 「水平関係」にある場合に relation を付ける
+            # y差 <= 41px AND x差 >= 40px
             if is_horizontal(
                 objects[i].center,
                 objects[j].center,
@@ -414,10 +436,6 @@ def build_relationships(
                 min_x_distance=horizontal_min_x_distance,
             ):
                 relationships["horizontal"][i].append(j)
-
-            # ---- within ----
-            # object i と object j が重なっている（接触している）場合、
-            # within[i].append(j) を追加する。
             # 双方向の overlap 判定を使用（どちらか一方でも閾値以上）
             if has_overlap(
                 objects[i].bbox,
