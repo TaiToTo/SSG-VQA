@@ -196,35 +196,104 @@ def is_within(
     return ratio >= overlap_threshold
 
 
+def has_overlap(
+    bbox1: Tuple[int, int, int, int],
+    bbox2: Tuple[int, int, int, int],
+    min_overlap_ratio: float = 0.20,
+) -> bool:
+    """
+    2つのbboxが重なっているかを判定（双方向、完全包含優先）。
+    
+    実データ分析の結果:
+    - 81.8%が完全包含（どちらか一方が他方に完全に含まれる）
+    - anatomy同士の最小overlap_max = 20%
+    - instrument→anatomyの最小overlap_max = 82.4%
+    
+    Parameters
+    ----------
+    bbox1, bbox2 : tuple
+        判定対象の2つのbbox
+    min_overlap_ratio : float
+        最小overlap比率（データ分析より20%）
+    
+    Returns
+    -------
+    bool
+        完全包含 OR overlap_max >= 20% なら True
+    
+    Notes
+    -----
+    実データの例：
+    - liver → gallbladder: overlap_max=100% (gallbladder完全にliver内)
+    - gut → omentum: overlap_max=20% (部分的重なり)
+    """
+    x1, y1, x2, y2 = bbox1
+    X1, Y1, X2, Y2 = bbox2
+    
+    area1 = bbox_area(bbox1)
+    area2 = bbox_area(bbox2)
+    
+    if area1 == 0 or area2 == 0:
+        return False
+    
+    # 完全包含チェック（優先）
+    bbox1_in_bbox2 = (x1 >= X1 and y1 >= Y1 and x2 <= X2 and y2 <= Y2)
+    bbox2_in_bbox1 = (X1 >= x1 and Y1 >= y1 and X2 <= x2 and Y2 <= y2)
+    
+    if bbox1_in_bbox2 or bbox2_in_bbox1:
+        return True
+    
+    # overlap_max チェック
+    inter = intersection_area(bbox1, bbox2)
+    
+    ratio1 = inter / area1
+    ratio2 = inter / area2
+    overlap_max = max(ratio1, ratio2)
+    
+    return overlap_max >= min_overlap_ratio
+
+
+
 def is_horizontal(
     center_a: Tuple[float, float],
     center_b: Tuple[float, float],
-    y_threshold: float = 10.0,
+    y_threshold: float = 40.0,
+    min_x_distance: float = 40.0,
 ) -> bool:
     """
-    2物体が「ほぼ同じ高さ」にあるかを判定する。
-
+    2つのオブジェクトが「水平関係」にあるかを判定する。
+    
+    実データ分析の結果:
+    - y差: 0.0～40.5px（最大40.5px）
+    - x差: 41.5～151.5px（最小41.5px、平均94.5px）
+    
     Parameters
     ----------
     center_a, center_b : tuple
-        物体中心座標 (cx, cy)
+        各オブジェクトの中心座標 (x, y)
     y_threshold : float
-        y差がこの値以下なら horizontal とみなす
+        許容するy座標の差分（データ分析より40px）
+    min_x_distance : float
+        最小x距離（データ分析より40px）
 
     Returns
     -------
     bool
-        2物体がほぼ水平に並んでいれば True
-
+        y差 <= 40px AND x差 >= 40px なら True
+        
     Notes
     -----
-    論文本文に horizontal の厳密定義はありません。
-    ここでは JSON 例に合わせて、
-    「中心 y 座標が近い」ものを horizontal とする実装を採用しています。
+    x差の条件がないと、垂直に並んでいるペアも誤検出してしまう。
+    horizontal関係は「横に並んでいる」という意味なので、
+    十分なx距離が必要。
     """
-    _, ya = center_a
-    _, yb = center_b
-    return abs(ya - yb) <= y_threshold
+    xa, ya = center_a
+    xb, yb = center_b
+    
+    y_diff = abs(ya - yb)
+    x_diff = abs(xa - xb)
+    
+    return y_diff <= y_threshold and x_diff >= min_x_distance
 
 
 # ============================================================
@@ -234,8 +303,10 @@ def is_horizontal(
 def build_relationships(
     objects: List[ObjectNode],
     triplets: List[str],
-    horizontal_y_threshold: float = 10.0,
-    within_overlap_threshold: float = 0.9,
+    horizontal_y_threshold: float = 40.0,
+    horizontal_min_x_distance: float = 40.0,
+    within_overlap_threshold: float = 0.20,
+    min_spatial_distance: float = 40.0,
 ) -> Dict[str, List[List[int]]]:
     """
     objects と triplets から relationship 辞書を構築する。
@@ -248,9 +319,11 @@ def build_relationships(
         action relation を表す文字列の配列
         例: ["grasper,grasp,gallbladder"]
     horizontal_y_threshold : float
-        horizontal 判定で使う y差の閾値
+        horizontal 判定で使う y差の閾値（データ分析より40px）
+    horizontal_min_x_distance : float
+        horizontal 判定で使う最小x距離（データ分析より40px）
     within_overlap_threshold : float
-        within 判定で使う overlap ratio の閾値
+        within 判定で使う overlap ratio の閾値（データ分析より20%）
 
     Returns
     -------
@@ -313,34 +386,43 @@ def build_relationships(
 
             # ---- left / right ----
             # object j が object i より左にあれば left[i] に j を入れる。
-            if xj < xi:
-                relationships["left"][i].append(j)
-            elif xj > xi:
-                relationships["right"][i].append(j)
-            # x が完全一致なら left/right はどちらにも入れない
+            # ただし、x差が min_spatial_distance 以上の場合のみ。
+            x_diff = abs(xj - xi)
+            if x_diff >= min_spatial_distance:
+                if xj < xi:
+                    relationships["left"][i].append(j)
+                elif xj > xi:
+                    relationships["right"][i].append(j)
 
             # ---- above / below ----
             # 画像座標系では y が小さいほど「上」。
-            if yj < yi:
-                relationships["above"][i].append(j)
-            elif yj > yi:
-                relationships["below"][i].append(j)
-            # y が完全一致なら above/below はどちらにも入れない
+            # ただし、y差が min_spatial_distance 以上の場合のみ。
+            y_diff = abs(yj - yi)
+            if y_diff >= min_spatial_distance:
+                if yj < yi:
+                    relationships["above"][i].append(j)
+                elif yj > yi:
+                    relationships["below"][i].append(j)
 
             # ---- horizontal ----
-            # 「ほぼ同じ高さ」にある場合に relation を付ける。
-            # JSON 例では全ペアに付けていないので、明確なルールが必要。
-            # ここでは y差の閾値のみで判定している。
-            if is_horizontal(objects[i].center, objects[j].center, y_threshold=horizontal_y_threshold):
+            # 「水平関係」にある場合に relation を付ける。
+            # 実データ分析より: y差 <= 40px AND x差 >= 40px
+            if is_horizontal(
+                objects[i].center,
+                objects[j].center,
+                y_threshold=horizontal_y_threshold,
+                min_x_distance=horizontal_min_x_distance,
+            ):
                 relationships["horizontal"][i].append(j)
 
             # ---- within ----
-            # object i の bbox が object j の bbox に十分含まれていれば
-            # i --within--> j を付与する。
-            if is_within(
+            # object i と object j が重なっている（接触している）場合、
+            # within[i].append(j) を追加する。
+            # 双方向の overlap 判定を使用（どちらか一方でも閾値以上）
+            if has_overlap(
                 objects[i].bbox,
                 objects[j].bbox,
-                overlap_threshold=within_overlap_threshold,
+                min_overlap_ratio=within_overlap_threshold,
             ):
                 relationships["within"][i].append(j)
 
@@ -426,8 +508,10 @@ def build_scene_graph(scene: Dict[str, Any], info: Dict[str, Any]) -> Dict[str, 
     relationships = build_relationships(
         objects=objects,
         triplets=triplets,
-        horizontal_y_threshold=10.0,
-        within_overlap_threshold=0.9,
+        horizontal_y_threshold=40.0,
+        horizontal_min_x_distance=40.0,
+        within_overlap_threshold=0.20,
+        min_spatial_distance=40.0,
     )
 
     # 元の object 情報を JSON に戻しやすい形で再構築する
